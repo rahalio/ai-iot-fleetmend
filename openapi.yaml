@@ -1,0 +1,371 @@
+openapi: 3.0.3
+info:
+  title: FleetMend
+  version: 0.1.0
+  description: >-
+    Hierarchical fuzzy-SVM predictive maintenance for industrial IoT vehicle fleets.
+  x-product-slug: ai-iot-fleetmend
+  x-source: ai-in-iot/1806.09612/
+servers:
+  - url: https://api.example.com
+tags:
+  - name: Fleets
+  - name: Vehicles
+  - name: Models
+  - name: RiskScores
+  - name: WorkSuggestions
+paths:
+  /v1/fleets:
+    get:
+      operationId: listFleets
+      tags: [Fleets]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Fleets
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeFleet" }
+    post:
+      operationId: createFleet
+      tags: [Fleets]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Fleet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeFleet" }
+  /v1/vehicles:
+    get:
+      operationId: listVehicles
+      tags: [Vehicles]
+      security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - name: fleetId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Vehicles
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeVehicle" }
+    post:
+      operationId: upsertVehicle
+      tags: [Vehicles]
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Vehicle" }
+      responses:
+        "201":
+          description: Upserted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeVehicle" }
+  /v1/models:
+    get:
+      operationId: listMendModels
+      tags: [Models]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Models
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeMendModel" }
+    post:
+      operationId: trainMendModel
+      tags: [Models]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fleetId, garageId, horizonDays]
+              properties:
+                fleetId: { type: string }
+                garageId: { type: string }
+                horizonDays: { type: integer }
+                trainingWindowDays: { type: integer }
+      responses:
+        "202":
+          description: Training accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeMendModel" }
+  /v1/risk-scores:
+    get:
+      operationId: listRiskScores
+      tags: [RiskScores]
+      security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - name: fleetId
+          in: query
+          schema: { type: string }
+        - name: minProbability
+          in: query
+          schema: { type: number, format: float }
+      responses:
+        "200":
+          description: Risk scores
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeRiskScore" }
+  /v1/risk-scores/{scoreId}:
+    parameters: [{ name: scoreId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getRiskScore
+      tags: [RiskScores]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Risk score
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeRiskScore" }
+  /v1/work-suggestions:
+    get:
+      operationId: listWorkSuggestions
+      tags: [WorkSuggestions]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeWorkSuggestion" }
+    post:
+      operationId: createWorkSuggestion
+      tags: [WorkSuggestions]
+      security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkSuggestion" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeWorkSuggestion" }
+  /v1/work-suggestions/{suggestionId}/decision:
+    parameters: [{ name: suggestionId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: decideWorkSuggestion
+      tags: [WorkSuggestions]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [accept, defer, reject] }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeWorkSuggestion" }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+  schemas:
+    ResponseMeta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+    Fleet:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        vehicleCount: { type: integer }
+    Vehicle:
+      type: object
+      required: [id, fleetId, make, model]
+      properties:
+        id: { type: string }
+        fleetId: { type: string }
+        garageId: { type: string }
+        make: { type: string }
+        model: { type: string }
+        ageMonths: { type: integer }
+        distanceKm: { type: number, format: float }
+    MendModel:
+      type: object
+      required: [id, fleetId, garageId, status]
+      properties:
+        id: { type: string }
+        fleetId: { type: string }
+        garageId: { type: string }
+        horizonDays: { type: integer }
+        status: { type: string, enum: [training, ready, promoted, failed, retired] }
+        accuracy: { type: number, format: float }
+        sensitivity: { type: number, format: float }
+        specificity: { type: number, format: float }
+        auc: { type: number, format: float }
+    RiskScore:
+      type: object
+      required: [id, vehicleId, probability, horizonDays]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        modelId: { type: string }
+        probability: { type: number, format: float }
+        horizonDays: { type: integer }
+        topDrivers: { type: array, items: { type: string } }
+    WorkSuggestion:
+      type: object
+      required: [id, vehicleId, riskScoreId, status]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        riskScoreId: { type: string }
+        status: { type: string, enum: [proposed, accepted, deferred, rejected] }
+        cmmsWorkOrderId: { type: string }
+    DataEnvelopeFleet:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/Fleet" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeFleet:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Fleet" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeVehicle:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/Vehicle" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeVehicle:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Vehicle" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeMendModel:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/MendModel" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeMendModel:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MendModel" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeRiskScore:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/RiskScore" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeRiskScore:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/RiskScore" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeWorkSuggestion:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/WorkSuggestion" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeWorkSuggestion:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/WorkSuggestion" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
